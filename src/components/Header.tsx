@@ -1,10 +1,22 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Phone, Video, MapPin } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { LogOut, User } from 'lucide-react';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleAuthAction = () => {
+    if (user) {
+      signOut();
+    } else {
+      navigate('/auth');
+    }
+  };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
@@ -32,9 +44,31 @@ const Header = () => {
               <span>|</span>
               <span>EN</span>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              Start Free Check
-            </Button>
+            
+            {user ? (
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 text-sm text-gray-700">
+                  <User className="w-4 h-4" />
+                  <span className="hidden md:inline">Welcome back!</span>
+                </div>
+                <Button 
+                  onClick={handleAuthAction}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </Button>
+              </div>
+            ) : (
+              <Button 
+                onClick={handleAuthAction}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       </div>
