@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface AnalysisResult {
   possibleConditions: string[];
@@ -17,6 +17,8 @@ const SymptomChecker = () => {
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const symptoms = [
     { id: 'headache', emoji: '🤕', name: 'Headache', nameUz: 'Bosh og\'rig\'i' },
@@ -33,35 +35,72 @@ const SymptomChecker = () => {
         ? prev.filter(id => id !== symptomId)
         : [...prev, symptomId]
     );
-    // Clear previous analysis when symptoms change
+    // Clear previous analysis and errors when symptoms change
     setAnalysis(null);
+    setError(null);
   };
 
   const analyzeSymptoms = async () => {
+    console.log('Starting symptom analysis...');
+    console.log('Selected symptoms:', selectedSymptoms);
+    
     setIsAnalyzing(true);
+    setError(null);
     
     try {
       const selectedSymptomNames = selectedSymptoms.map(id => 
         symptoms.find(s => s.id === id)?.name
       ).filter(Boolean);
 
+      console.log('Symptom names to analyze:', selectedSymptomNames);
+
+      if (selectedSymptomNames.length === 0) {
+        throw new Error('Please select at least one symptom to analyze');
+      }
+
+      console.log('Calling Supabase function...');
       const { data, error } = await supabase.functions.invoke('analyze-symptoms', {
         body: { symptoms: selectedSymptomNames }
       });
 
+      console.log('Function response:', { data, error });
+
       if (error) {
-        throw error;
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to analyze symptoms');
       }
 
+      if (!data || !data.analysis) {
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid response from analysis service');
+      }
+
+      console.log('Analysis result:', data.analysis);
       setAnalysis(data.analysis);
+      
+      toast({
+        title: "Analysis Complete",
+        description: "Your symptoms have been analyzed successfully.",
+      });
+
     } catch (error) {
       console.error('Error analyzing symptoms:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(errorMessage);
+      
+      toast({
+        title: "Analysis Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      
+      // Fallback analysis for better user experience
       setAnalysis({
-        possibleConditions: ['Analysis Error'],
+        possibleConditions: ['Analysis temporarily unavailable'],
         severity: 'moderate',
-        recommendations: ['Unable to analyze symptoms. Please try again or consult a healthcare professional.'],
+        recommendations: ['Please try again later or consult with a healthcare professional for proper evaluation'],
         seekImmediateCare: false,
-        disclaimer: 'This AI analysis is for informational purposes only.'
+        disclaimer: 'This AI analysis is for informational purposes only and should not replace professional medical advice.'
       });
     } finally {
       setIsAnalyzing(false);
@@ -146,6 +185,18 @@ const SymptomChecker = () => {
                         <div className="flex items-center space-x-3">
                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                           <span className="text-blue-800">AI is analyzing your symptoms...</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {error && (
+                      <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <AlertCircle className="w-5 h-5 text-red-600" />
+                          <div>
+                            <p className="text-red-800 font-medium">Analysis Error</p>
+                            <p className="text-red-700 text-sm">{error}</p>
+                          </div>
                         </div>
                       </div>
                     )}
